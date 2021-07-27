@@ -137,5 +137,3 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
-dafits/__pycache__/__init__.cpython-39.pyc
-dafits/__pycache__/delayed.cpython-39.pyc
