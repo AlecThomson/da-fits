@@ -6,6 +6,17 @@ Inspired by:
 - https://github.com/sunpy/sunpy/issues/2715
 - https://github.com/ska-sa/xarray-fits
 
+## Installation
+
+Install from PyPi
+```
+pip install dafits
+```
+Or, from GitHub:
+```
+pip install git+https://github.com/AlecThomson/da-fits.git
+```
+
 ## Example usage
 
 ```python
