@@ -29,9 +29,9 @@ class DelayedFITSIO:
         self.hdu = hdu
 
         with FITS(self.file) as hdul:
-            self.shape = hdul[hdu].read().shape
+            self.shape = tuple(hdul[hdu].get_dims())
             self.dtype = hdul[hdu].read().dtype
             self.ndim = len(self.shape)
     def __getitem__(self, view):
         with FITS(self.file) as hdul:
-            return hdul[self.hdu].read()[view]
+            return hdul[self.hdu][view]
