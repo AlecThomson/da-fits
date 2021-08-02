@@ -23,8 +23,8 @@ pip install git+https://github.com/AlecThomson/da-fits.git
 import dafits
 
 # Use astropy
-dafits.da_from_fits('/path/to/file.fits')
+dafits.da_from_fits('/path/to/file.fits', hdu=0, chunks='auto')
 
 # Use FITSIO -- can be faster than astropy
-dafits.da_from_fitsio('/path/to/file.fits')
+dafits.da_from_fitsio('/path/to/file.fits', hdu=0, chunks='auto')
 ```
