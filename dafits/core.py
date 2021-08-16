@@ -27,6 +27,9 @@ class DaFits:
             use_fitsio (bool, optional): Use FITSIO for IO. Defaults to True. Otherwise uses astropy.io.
             memmap (bool, optional): For astropy,fts. Defaults to True.
             mode (str, optional): For astropy.io.fits. Defaults to 'denywrite'.
+        Attributes:
+            data (dask.array.Array): Dask Array wrapper around data.
+            header (header): FITS header. Read by either astropy or FITSIO.
         """        
         self.file = file
         self.chunks = chunks
