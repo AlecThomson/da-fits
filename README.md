@@ -20,11 +20,23 @@ pip install git+https://github.com/AlecThomson/da-fits.git
 ## Example usage
 
 ```python
-import dafits
+from dafits import DaFits
+
+# See doctstring
+help(DaFits)
 
 # Use astropy
-dafits.da_from_fits('/path/to/file.fits', hdu=0, chunks='auto')
+da_fits = DaFits('/path/to/file.fits', use_fitsio=False, memmap=True, mode='denywrite')
 
 # Use FITSIO -- can be faster than astropy
-dafits.da_from_fitsio('/path/to/file.fits', hdu=0, chunks='auto')
+da_fits = DaFits('/path/to/file.fits', hdu=0, chunks='auto')
+
+# Access dask array
+data = da_fits.data
+
+# Access header
+header = da_fits.header
+
+# Get data in memory
+data.compute()
 ```
