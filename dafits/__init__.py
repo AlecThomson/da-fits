@@ -5,6 +5,6 @@
 
 __author__ = """Alec Thomson"""
 __email__ = 'alec.thomson@csiro.au'
-__version__ = '0.0.2'
+__version__ = '0.1.0'
 
-from dafits.read import da_from_fits, da_from_fitsio
+from dafits.core import DaFits
