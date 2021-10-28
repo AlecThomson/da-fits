@@ -2,6 +2,8 @@
 
 Read FITS files into Dask Arrays. Currently a very simple implementation.
 
+NOTE: Astropy can't write from a Dask array to FITS in parallel (see [#11159](https://github.com/astropy/astropy/issues/11159)). As a workaround, I write to a temporary Zarr file (which supports parallel write), and then copy to a FITS file in serial. Keep this in mind for very large files!
+
 Inspired by:
 - https://github.com/sunpy/sunpy/issues/2715
 - https://github.com/ska-sa/xarray-fits
