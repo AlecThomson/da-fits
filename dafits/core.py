@@ -1,88 +1,99 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from astropy.io import fits
+from fitsio import FITS
 import dask.array as da
 import shutil
-from dataclasses import dataclass
+import typing
+import zarr
+from zarr.storage import ContainsArrayError
 
-@dataclass
-class DaFits:
-    def __init__(self, data = None, header = None, chunks='auto'):
-        """Class for handling FITS files as Dask Arrays.
+def read(
+    file: str,
+    ext=0,
+    memmap=True,
+    mode="denywrite",
+    chunks="auto",
+    use_fitsio=False,
+    return_header=False,
+) -> typing.Tuple[da.Array, typing.Optional[typing.Dict]]:
+    """Read FITS file to DataArray.
 
-        Args:
-            data (da.Array, optional): Dask Array data. Defaults to None.
-            header (header, optional): FITS header. Defaults to None.
-            chunks (str, optional): Dask Array chuncks. Defaults to 'auto'.
-            verbose (bool, optional): Verbose output. Defaults to False.
-        """               
-        self.chunks = chunks
-        self.data = data
-        self.header = header
+    Args:
+        file (str): FITS file to read.
+        ext (int, optional): FITS extension to read. Defaults to 0.
+        memmap (bool, optional): Use memmap. Defaults to True.
+        mode (str, optional): Read mode. Defaults to "denywrite".
+        chunks (str, optional): Dask array chunks. Defaults to "auto".
+        use_fitsio (bool, optional): Use FITSIO lib for I/O. Defaults to False.
+        return_header (bool, optional): Optionally return the FITS header. Defaults to False.
 
-    def read_fits(self, file: str, ext=0, memmap=True, mode='denywrite'):
-        from astropy.io import fits
-        with fits.open(file, memmap=memmap, mode=mode) as hdul:
-            hdu = hdul[ext]
-            data = hdu.data
-            header = hdu.header
-        array = da.from_array(data, chunks=self.chunks)
-        self.data = array
-        self.header = header
-
-    def read_fitsio(self, file: str, ext=0):
-        from fitsio import FITS
+    Returns:
+        typing.Tuple[da.Array, typing.Optional[typing.Dict]]: DataArray and (optionally) FITS header.
+    """
+    if use_fitsio:
         with FITS(file) as hdul:
             hdu = hdul[ext]
             data = hdu.read()
             header = hdu.read_header()
-        array = da.from_array(data, chunks=self.chunks)
-        self.data = array
-        self.header = header
+    else:
 
-    def write_fits(self, file, header=None, verbose=True, **kwargs):
-        """Write Dask Array to FITS file.
+        with fits.open(file, memmap=memmap, mode=mode) as hdul:
+            hdu = hdul[ext]
+            data = hdu.data
+            header = hdu.header
+    array = da.from_array(data, chunks=chunks)
 
-        Args:
-            file (str): Name of FITS file.
-            header (header, optional): FITS header. Defaults to None.
-            **kwargs:
-        """
-        from astropy.io import fits
-        if header is None:
-            header = self.header
-        tmp_file, z_data = self.write_tmp_zarr(file, self.data, self.verbose)
-        hdu = fits.PrimaryHDU(z_data, header=header)
-        hdu.writeto(file, **kwargs)
-        if self.verbose:
-            print(f'Wrote FITS file: {file}')
-        shutil.rmtree(tmp_file)
+    if return_header:
+        ret = (array, header)
+    else:
+        ret = array
+    return ret
 
-    def write_fitsio(self, file, header=None, verbose=True, **kwargs):
-        """Write Dask Array to FITS file.
 
-        Args:
-            file (str): Name of FITS file.
-            header (header, optional): FITS header. Defaults to None.
-            **kwargs:
-        """
-        from fitsio import FITS
-        if header is None:
-            header = self.header
-        tmp_file, z_data = self.write_tmp_zarr(file, self.data, self.verbose)
-        hdu = FITS(file, mode='rw')
+def write(file: str, data: da.Array, header=None, verbose=True, use_fitsio=False, **kwargs) -> None:
+    """Write DataArray to FITS file (via Zarr).
+
+    Args:
+        file (str): Output filename.
+        data (da.Array): Input data.
+        header (header, optional): FITS header. Defaults to None.
+        verbose (bool, optional): Verbose output. Defaults to True.
+        use_fitsio (bool, optional): Use FITSIO lib for I/O. Defaults to False.
+    """
+    # Write to temporary file
+    tmp_file, z_data = write_tmp_zarr(file, data, verbose)
+    if use_fitsio:
+        hdu = FITS(file, mode="rw")
         hdu.write(z_data, header=header, **kwargs)
         hdu.close()
-        if self.verbose:
-            print(f'Wrote FITS file: {file}')
-        shutil.rmtree(tmp_file)
+    else:
+        hdu = fits.PrimaryHDU(z_data, header=header)
+        hdu.writeto(file, **kwargs)
+    if verbose:
+        print(f"Wrote FITS file: {file}")
+    shutil.rmtree(tmp_file)
 
-    @staticmethod
-    def write_tmp_zarr(file, data, verbose=False):
-        import zarr
-        tmp_file = file.replace('.fits', '_tmp.zarr')
-        if verbose:
-            print(f'Writing temporary zarr file: {tmp_file}')
+
+def write_tmp_zarr(file: str, data: da.Array, verbose=False) -> typing.Tuple[str, da.Array]:
+    """Write DataArray to temporary Zarr file.
+
+    Args:
+        file (str): Output filename.
+        data (da.Array): DataArray to write.
+        verbose (bool, optional): Verbose output. Defaults to False.
+
+    Returns:
+        typing.Tuple[str, da.Array]: Temporary Zarr file and data.
+    """
+    tmp_file = '.' + file.replace(".fits", "_tmp.zarr")
+    if verbose:
+        print(f"Writing temporary zarr file: {tmp_file}")
+    try:
         data.to_zarr(tmp_file)
-        z_data = zarr.open(tmp_file, mode='r')
-        return tmp_file, z_data
+    except ContainsArrayError:
+        shutil.rmtree(tmp_file)
+        data.to_zarr(tmp_file)
+    z_data = zarr.open(tmp_file, mode="r")
+    return tmp_file, z_data

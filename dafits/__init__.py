@@ -6,4 +6,4 @@
 __author__ = """Alec Thomson"""
 __email__ = 'alec.thomson@csiro.au'
 
-from dafits.core import DaFits
+from dafits.core import read, write
