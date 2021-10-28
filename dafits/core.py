@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from astropy.io import fits
-from fitsio import FITS
 import dask.array as da
 import shutil
 import typing
@@ -15,7 +14,6 @@ def read(
     memmap=True,
     mode="denywrite",
     chunks="auto",
-    use_fitsio=False,
     return_header=False,
 ) -> typing.Tuple[da.Array, typing.Optional[typing.Dict]]:
     """Read FITS file to DataArray.
@@ -26,23 +24,15 @@ def read(
         memmap (bool, optional): Use memmap. Defaults to True.
         mode (str, optional): Read mode. Defaults to "denywrite".
         chunks (str, optional): Dask array chunks. Defaults to "auto".
-        use_fitsio (bool, optional): Use FITSIO lib for I/O. Defaults to False.
         return_header (bool, optional): Optionally return the FITS header. Defaults to False.
 
     Returns:
         typing.Tuple[da.Array, typing.Optional[typing.Dict]]: DataArray and (optionally) FITS header.
     """
-    if use_fitsio:
-        with FITS(file) as hdul:
-            hdu = hdul[ext]
-            data = hdu.read()
-            header = hdu.read_header()
-    else:
-
-        with fits.open(file, memmap=memmap, mode=mode) as hdul:
-            hdu = hdul[ext]
-            data = hdu.data
-            header = hdu.header
+    with fits.open(file, memmap=memmap, mode=mode) as hdul:
+        hdu = hdul[ext]
+        data = hdu.data
+        header = hdu.header
     array = da.from_array(data, chunks=chunks)
 
     if return_header:
@@ -52,7 +42,7 @@ def read(
     return ret
 
 
-def write(file: str, data: da.Array, header=None, verbose=True, use_fitsio=False, **kwargs) -> None:
+def write(file: str, data: da.Array, header=None, verbose=True, **kwargs) -> None:
     """Write DataArray to FITS file (via Zarr).
 
     Args:
@@ -60,20 +50,16 @@ def write(file: str, data: da.Array, header=None, verbose=True, use_fitsio=False
         data (da.Array): Input data.
         header (header, optional): FITS header. Defaults to None.
         verbose (bool, optional): Verbose output. Defaults to True.
-        use_fitsio (bool, optional): Use FITSIO lib for I/O. Defaults to False.
     """
     # Write to temporary file
     tmp_file, z_data = write_tmp_zarr(file, data, verbose)
-    if use_fitsio:
-        hdu = FITS(file, mode="rw")
-        hdu.write(z_data, header=header, **kwargs)
-        hdu.close()
-    else:
-        hdu = fits.PrimaryHDU(z_data, header=header)
-        hdu.writeto(file, **kwargs)
+    hdu = fits.PrimaryHDU(z_data, header=header)
+    hdu.writeto(file, **kwargs)
     if verbose:
         print(f"Wrote FITS file: {file}")
     shutil.rmtree(tmp_file)
+    if verbose:
+        print(f"Deleted temporary zarr file: {tmp_file}")
 
 
 def write_tmp_zarr(file: str, data: da.Array, verbose=False) -> typing.Tuple[str, da.Array]:
