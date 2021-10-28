@@ -144,3 +144,5 @@ dask-worker-space/*
 # Tests
 test.py
 *.ipynb
+*.fits
+*.zarr

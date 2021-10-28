@@ -1,64 +1,86 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from astropy.io import fits
 import dask.array as da
+import shutil
+import typing
+import zarr
+from zarr.storage import ContainsArrayError
 
-class DaFits:
-    def __init__(self, file: str, ext=0, chunks='auto', use_fitsio=True, memmap=True, mode='denywrite'):
-        """Extract FITS data as Dask 
+def read(
+    file: str,
+    ext=0,
+    memmap=True,
+    mode="denywrite",
+    chunks="auto",
+    return_header=False,
+) -> typing.Tuple[da.Array, typing.Optional[typing.Dict]]:
+    """Read FITS file to DataArray.
 
-        Args:
-            file (str): Name of FITS file.
-            ext (int, optional): HDU extension to select. Defaults to 0.
-            chunks (int, tuple, optional):
-                How to chunk the array. Must be one of the following forms:
+    Args:
+        file (str): FITS file to read.
+        ext (int, optional): FITS extension to read. Defaults to 0.
+        memmap (bool, optional): Use memmap. Defaults to True.
+        mode (str, optional): Read mode. Defaults to "denywrite".
+        chunks (str, optional): Dask array chunks. Defaults to "auto".
+        return_header (bool, optional): Optionally return the FITS header. Defaults to False.
 
-                - A blocksize like 1000.
-                - A blockshape like (1000, 1000).
-                - Explicit sizes of all blocks along all dimensions like
-                ((1000, 1000, 500), (400, 400)).
-                - A size in bytes, like "100 MiB" which will choose a uniform
-                block-like shape
-                - The word "auto" which acts like the above, but uses a configuration
-                value ``array.chunk-size`` for the chunk size
+    Returns:
+        typing.Tuple[da.Array, typing.Optional[typing.Dict]]: DataArray and (optionally) FITS header.
+    """
+    with fits.open(file, memmap=memmap, mode=mode) as hdul:
+        hdu = hdul[ext]
+        data = hdu.data
+        header = hdu.header
+    array = da.from_array(data, chunks=chunks)
 
-                -1 or None as a blocksize indicate the size of the corresponding
-                dimension.
-            use_fitsio (bool, optional): Use FITSIO for IO. Defaults to True. Otherwise uses astropy.io.
-            memmap (bool, optional): For astropy,fts. Defaults to True.
-            mode (str, optional): For astropy.io.fits. Defaults to 'denywrite'.
-        Attributes:
-            data (dask.array.Array): Dask Array wrapper around data.
-            header (header): FITS header. Read by either astropy or FITSIO.
-        """        
-        self.file = file
-        self.chunks = chunks
-        self.ext = ext
-        self.memmap = memmap
-        self.mode = mode
+    if return_header:
+        ret = (array, header)
+    else:
+        ret = array
+    return ret
 
-        if use_fitsio:
-            data, header = self.read_fitsio()
-        else:
-            data, header = self.read_fits()
 
-        self.data = data
-        self.header = header
+def write(file: str, data: da.Array, header=None, verbose=True, **kwargs) -> None:
+    """Write DataArray to FITS file (via Zarr).
 
-    def read_fits(self):
-        from astropy.io import fits
-        with fits.open(self.file, memmap=self.memmap, mode=self.mode) as hdul:
-            hdu = hdul[self.ext]
-            data = hdu.data
-            header = hdu.header
-        array = da.from_array(data, chunks=self.chunks)
-        return array, header
+    Args:
+        file (str): Output filename.
+        data (da.Array): Input data.
+        header (header, optional): FITS header. Defaults to None.
+        verbose (bool, optional): Verbose output. Defaults to True.
+        **kwargs: Additional keyword arguments passed onto fits.writeto.
+    """
+    # Write to temporary file
+    tmp_file, z_data = write_tmp_zarr(file, data, verbose)
+    hdu = fits.PrimaryHDU(z_data, header=header)
+    hdu.writeto(file, **kwargs)
+    if verbose:
+        print(f"Wrote FITS file: {file}")
+    shutil.rmtree(tmp_file)
+    if verbose:
+        print(f"Deleted temporary zarr file: {tmp_file}")
 
-    def read_fitsio(self):
-        from fitsio import FITS,FITSHDR
-        with FITS(self.file) as hdul:
-            hdu = hdul[self.ext]
-            data = hdu.read()
-            header = hdu.read_header()
-        array = da.from_array(data, chunks=self.chunks)
-        return array, header
+
+def write_tmp_zarr(file: str, data: da.Array, verbose=False) -> typing.Tuple[str, da.Array]:
+    """Write DataArray to temporary Zarr file.
+
+    Args:
+        file (str): Output filename.
+        data (da.Array): DataArray to write.
+        verbose (bool, optional): Verbose output. Defaults to False.
+
+    Returns:
+        typing.Tuple[str, da.Array]: Temporary Zarr file and data.
+    """
+    tmp_file = '.' + file.replace(".fits", "_tmp.zarr")
+    if verbose:
+        print(f"Writing temporary zarr file: {tmp_file}")
+    try:
+        data.to_zarr(tmp_file)
+    except ContainsArrayError:
+        shutil.rmtree(tmp_file)
+        data.to_zarr(tmp_file)
+    z_data = zarr.open(tmp_file, mode="r")
+    return tmp_file, z_data
