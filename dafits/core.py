@@ -50,6 +50,7 @@ def write(file: str, data: da.Array, header=None, verbose=True, **kwargs) -> Non
         data (da.Array): Input data.
         header (header, optional): FITS header. Defaults to None.
         verbose (bool, optional): Verbose output. Defaults to True.
+        **kwargs: Additional keyword arguments passed onto fits.writeto.
     """
     # Write to temporary file
     tmp_file, z_data = write_tmp_zarr(file, data, verbose)
