@@ -6,28 +6,6 @@ import dask.array as da
 import shutil
 import typing
 import zarr
-from spectral_cube import DaskSpectralCube
-from astropy.wcs import WCS
-
-class ArrayHandler:
-    """
-    This class is a wrapper for the data which can be used to
-    initialize a dask array. It provides a way for the filled data to be
-    constructed just for the requested chunks.
-    """
-
-    def __init__(self, data, header):
-        self._data = data
-        self._wcs = WCS(header)
-        self.shape = data.shape
-        self.dtype = data.dtype
-        self.ndim = len(self.shape)
-
-    def __getitem__(self, view):
-        if self._data[view].size == 0:
-            return 0.
-        else:
-            return self._data[view]
 
 def read(
     file: str,
@@ -56,10 +34,9 @@ def read(
         typing.Tuple[da.Array, typing.Optional[typing.Dict]]: DataArray and (optionally) FITS header.
     """
     with fits.open(file, memmap=memmap, mode=mode, **fits_kwargs) as hdulist:
-        header = hdulist[0].header
-        data = hdulist[0].data
-    ah = ArrayHandler(data, header)
-    array = da.from_array(ah, chunks=chunks, **dask_kwargs)
+        header = hdulist[ext].header
+        data = hdulist[ext].data
+    array = da.from_array(data, chunks=chunks, **dask_kwargs)
 
     if return_header:
         return array, header
