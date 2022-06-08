@@ -7,9 +7,10 @@ import shutil
 import typing
 import zarr
 from dask import delayed
+import numpy as np
 
 def mmap_load_chunk(
-    file:str, 
+    data: np.ndarray, 
     sl:slice,
     ext:int=0,
     memmap:bool=True,
@@ -24,8 +25,8 @@ def mmap_load_chunk(
     Returns:
         da.Array: Dask array chunk.
     """
-    with fits.open(file, memmap=memmap, mode=mode) as hdulist:
-        data = hdulist[ext].data
+    # with fits.open(file, memmap=memmap, mode=mode) as hdulist:
+    #     data = hdulist[ext].data
     return data[sl]
 
 def mmap_dask_array(
@@ -65,7 +66,7 @@ def mmap_dask_array(
         chunk_size = min(blocksize, shape[-1] - index)
         chunk = da.from_delayed(
             load(
-                file,
+                arr,
                 sl=slice(index, index + chunk_size)
             ),
             shape= shape[:-1] + (chunk_size,),
