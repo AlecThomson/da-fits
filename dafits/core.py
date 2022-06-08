@@ -6,12 +6,12 @@ import dask.array as da
 import shutil
 import typing
 import zarr
-from zarr.storage import ContainsArrayError
 from spectral_cube import DaskSpectralCube
+
 
 def read(
     file: str,
-    return_header:bool=False,
+    return_header: bool = False,
     **kwargs,
 ) -> typing.Tuple[da.Array, typing.Optional[typing.Dict]]:
     """Read FITS file to DataArray.
@@ -31,13 +31,14 @@ def read(
         return array, cube.header
     return array
 
+
 def write(
-    file: str, 
-    data: da.Array, 
-    header:fits.Header=None, 
-    verbose=True, 
-    purge=True, 
-    **kwargs
+    file: str,
+    data: da.Array,
+    header: fits.Header = None,
+    verbose=True,
+    purge=True,
+    **kwargs,
 ) -> None:
     """Write DataArray to FITS file (via Zarr).
 
@@ -51,9 +52,9 @@ def write(
     """
     # Write to temporary file
     tmp_file, z_data = write_tmp_zarr(
-        file=file.replace(".fits", "_tmp.zarr"), 
-        data=data, 
-        header=header, 
+        file=file.replace(".fits", "_tmp.zarr"),
+        data=data,
+        header=header,
         verbose=verbose,
     )
     hdu = fits.PrimaryHDU(z_data, header=header)
@@ -67,11 +68,11 @@ def write(
 
 
 def write_tmp_zarr(
-    file: str, 
+    file: str,
     data: da.Array,
-    header:fits.Header=None,
-    verbose:bool=False, 
-    overwrite:bool=False
+    header: fits.Header = None,
+    verbose: bool = False,
+    overwrite: bool = False,
 ) -> typing.Tuple[str, da.Array]:
     """Write DataArray to temporary Zarr file.
     Computation will begin as the data is written to the Zarr file.
@@ -90,7 +91,7 @@ def write_tmp_zarr(
         print(f"Writing temporary zarr file: {tmp_file}")
     data.to_zarr(tmp_file, overwrite=overwrite)
     if header is not None:
-        _z_data = zarr.open(tmp_file, mode='r+')
-        _z_data.attrs['header'] = header.tostring()
+        _z_data = zarr.open(tmp_file, mode="r+")
+        _z_data.attrs["header"] = header.tostring()
     z_data = zarr.open(tmp_file, mode="r")
     return file, z_data
