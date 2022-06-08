@@ -7,42 +7,31 @@ import shutil
 import typing
 import zarr
 from zarr.storage import ContainsArrayError
+from spectral_cube import DaskSpectralCube
 
 def read(
     file: str,
-    ext=0,
-    memmap=True,
-    mode="denywrite",
-    chunks="auto",
-    return_header=False,
+    return_header:bool=False,
+    **kwargs,
 ) -> typing.Tuple[da.Array, typing.Optional[typing.Dict]]:
     """Read FITS file to DataArray.
 
     Args:
         file (str): FITS file to read.
-        ext (int, optional): FITS extension to read. Defaults to 0.
-        memmap (bool, optional): Use memmap. Defaults to True.
-        mode (str, optional): Read mode. Defaults to "denywrite".
-        chunks (str, optional): Dask array chunks. Defaults to "auto".
         return_header (bool, optional): Optionally return the FITS header. Defaults to False.
+        **kwargs (dict, optional): Additional keyword arguments passed onto DaskSpectralCube.read.
 
     Returns:
         typing.Tuple[da.Array, typing.Optional[typing.Dict]]: DataArray and (optionally) FITS header.
     """
-    with fits.open(file, memmap=memmap, mode=mode) as hdul:
-        hdu = hdul[ext]
-        data = hdu.data
-        header = hdu.header
-    array = da.from_array(data, chunks=chunks)
+    cube = DaskSpectralCube.read(file, **kwargs)
+    array = cube._get_filled_data()
 
     if return_header:
-        ret = (array, header)
-    else:
-        ret = array
-    return ret
+        return array, cube.header
+    return array
 
-
-def write(file: str, data: da.Array, header=None, verbose=True, **kwargs) -> None:
+def write(file: str, data: da.Array, header=None, verbose=True, purge=True, **kwargs) -> None:
     """Write DataArray to FITS file (via Zarr).
 
     Args:
@@ -50,6 +39,7 @@ def write(file: str, data: da.Array, header=None, verbose=True, **kwargs) -> Non
         data (da.Array): Input data.
         header (header, optional): FITS header. Defaults to None.
         verbose (bool, optional): Verbose output. Defaults to True.
+        purge (bool, optional): Purge temporary Zarr file. Defaults to True.
         **kwargs: Additional keyword arguments passed onto fits.writeto.
     """
     # Write to temporary file
@@ -58,18 +48,21 @@ def write(file: str, data: da.Array, header=None, verbose=True, **kwargs) -> Non
     hdu.writeto(file, **kwargs)
     if verbose:
         print(f"Wrote FITS file: {file}")
-    shutil.rmtree(tmp_file)
-    if verbose:
-        print(f"Deleted temporary zarr file: {tmp_file}")
+    if purge:
+        shutil.rmtree(tmp_file)
+        if verbose:
+            print(f"Deleted temporary zarr file: {tmp_file}")
 
 
-def write_tmp_zarr(file: str, data: da.Array, verbose=False) -> typing.Tuple[str, da.Array]:
+def write_tmp_zarr(file: str, data: da.Array, verbose:bool=False, overwrite:bool=False) -> typing.Tuple[str, da.Array]:
     """Write DataArray to temporary Zarr file.
+    Computation will begin as the data is written to the Zarr file.
 
     Args:
         file (str): Output filename.
         data (da.Array): DataArray to write.
         verbose (bool, optional): Verbose output. Defaults to False.
+        overwrite (bool, optional): Overwrite existing file. Defaults to False.
 
     Returns:
         typing.Tuple[str, da.Array]: Temporary Zarr file and data.
@@ -77,10 +70,6 @@ def write_tmp_zarr(file: str, data: da.Array, verbose=False) -> typing.Tuple[str
     tmp_file = '.' + file.replace(".fits", "_tmp.zarr")
     if verbose:
         print(f"Writing temporary zarr file: {tmp_file}")
-    try:
-        data.to_zarr(tmp_file)
-    except ContainsArrayError:
-        shutil.rmtree(tmp_file)
-        data.to_zarr(tmp_file)
+    data.to_zarr(tmp_file, overwrite=overwrite)
     z_data = zarr.open(tmp_file, mode="r")
     return tmp_file, z_data
