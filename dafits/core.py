@@ -25,8 +25,6 @@ def mmap_load_chunk(
     Returns:
         da.Array: Dask array chunk.
     """
-    # with fits.open(file, memmap=memmap, mode=mode) as hdulist:
-    #     data = hdulist[ext].data
     return data[sl]
 
 def mmap_dask_array(
@@ -48,13 +46,15 @@ def mmap_dask_array(
     Returns:
         da.Array: Full Dask array.
     """
-    arr = mmap_load_chunk(
-        file=file, 
-        sl=slice(0,-1),
-        ext=ext, 
-        memmap=memmap,
-        mode=mode,
-    )
+    # arr = mmap_load_chunk(
+    #     file=file, 
+    #     sl=slice(0,-1),
+    #     ext=ext, 
+    #     memmap=memmap,
+    #     mode=mode,
+    # )
+    with fits.open(file, memmap=memmap, mode=mode) as hdulist:
+        arr = hdulist[ext].data
     shape = arr.shape
     dtype = arr.dtype
 
