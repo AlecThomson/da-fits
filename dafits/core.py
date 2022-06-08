@@ -31,7 +31,14 @@ def read(
         return array, cube.header
     return array
 
-def write(file: str, data: da.Array, header=None, verbose=True, purge=True, **kwargs) -> None:
+def write(
+    file: str, 
+    data: da.Array, 
+    header:fits.Header=None, 
+    verbose=True, 
+    purge=True, 
+    **kwargs
+) -> None:
     """Write DataArray to FITS file (via Zarr).
 
     Args:
@@ -43,7 +50,12 @@ def write(file: str, data: da.Array, header=None, verbose=True, purge=True, **kw
         **kwargs: Additional keyword arguments passed onto fits.writeto.
     """
     # Write to temporary file
-    tmp_file, z_data = write_tmp_zarr(file, data, verbose)
+    tmp_file, z_data = write_tmp_zarr(
+        file=file.replace(".fits", "_tmp.zarr"), 
+        data=data, 
+        header=header, 
+        verbose=verbose,
+    )
     hdu = fits.PrimaryHDU(z_data, header=header)
     hdu.writeto(file, **kwargs)
     if verbose:
@@ -54,7 +66,13 @@ def write(file: str, data: da.Array, header=None, verbose=True, purge=True, **kw
             print(f"Deleted temporary zarr file: {tmp_file}")
 
 
-def write_tmp_zarr(file: str, data: da.Array, verbose:bool=False, overwrite:bool=False) -> typing.Tuple[str, da.Array]:
+def write_tmp_zarr(
+    file: str, 
+    data: da.Array,
+    header:fits.Header=None,
+    verbose:bool=False, 
+    overwrite:bool=False
+) -> typing.Tuple[str, da.Array]:
     """Write DataArray to temporary Zarr file.
     Computation will begin as the data is written to the Zarr file.
 
@@ -67,9 +85,12 @@ def write_tmp_zarr(file: str, data: da.Array, verbose:bool=False, overwrite:bool
     Returns:
         typing.Tuple[str, da.Array]: Temporary Zarr file and data.
     """
-    tmp_file = '.' + file.replace(".fits", "_tmp.zarr")
+    tmp_file = file
     if verbose:
         print(f"Writing temporary zarr file: {tmp_file}")
     data.to_zarr(tmp_file, overwrite=overwrite)
+    if header is not None:
+        _z_data = zarr.open(tmp_file, mode='r+')
+        _z_data.attrs['header'] = header.tostring()
     z_data = zarr.open(tmp_file, mode="r")
-    return tmp_file, z_data
+    return file, z_data
