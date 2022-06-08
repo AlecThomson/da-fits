@@ -7,28 +7,62 @@ import shutil
 import typing
 import zarr
 from spectral_cube import DaskSpectralCube
+from astropy.wcs import WCS
 
+class ArrayHandler:
+    """
+    This class is a wrapper for the data which can be used to
+    initialize a dask array. It provides a way for the filled data to be
+    constructed just for the requested chunks.
+    """
+
+    def __init__(self, data, header):
+        self._data = data
+        self._wcs = WCS(header)
+        self.shape = data.shape
+        self.dtype = data.dtype
+        self.ndim = len(self.shape)
+
+    def __getitem__(self, view):
+        if self._data[view].size == 0:
+            return 0.
+        else:
+            return self._data[view]
 
 def read(
     file: str,
+    ext:int=0,
+    memmap:bool=True,
+    mode:str="denywrite",
+    chunks:str="auto",
     return_header: bool = False,
-    **kwargs,
+    fits_kwargs: dict = {},
+    dask_kwargs: dict = {},
 ) -> typing.Tuple[da.Array, typing.Optional[typing.Dict]]:
     """Read FITS file to DataArray.
 
     Args:
         file (str): FITS file to read.
+        ext (int, optional): FITS extension to read. Defaults to 0.
+        memmap (bool, optional): Use memmap. Defaults to True.
+        mode (str, optional): Read mode. Defaults to "denywrite".
+        chunks (str, optional): Dask array chunks. Defaults to "auto".
         return_header (bool, optional): Optionally return the FITS header. Defaults to False.
-        **kwargs (dict, optional): Additional keyword arguments passed onto DaskSpectralCube.read.
+        fits_kwargs (dict, optional): Additional keyword arguments passed onto fits.open. Defaults to None.
+        dask_kwargs (dict, optional): Additional keyword arguments passed onto dask.from_array. Defaults to None.
+
 
     Returns:
         typing.Tuple[da.Array, typing.Optional[typing.Dict]]: DataArray and (optionally) FITS header.
     """
-    cube = DaskSpectralCube.read(file, **kwargs)
-    array = cube._get_filled_data()
+    with fits.open(file, memmap=memmap, mode=mode, **fits_kwargs) as hdulist:
+        header = hdulist[0].header
+        data = hdulist[0].data
+    ah = ArrayHandler(data, header)
+    array = da.from_array(ah, chunks=chunks, **dask_kwargs)
 
     if return_header:
-        return array, cube.header
+        return array, header
     return array
 
 
