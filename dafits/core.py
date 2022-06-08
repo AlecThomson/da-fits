@@ -6,16 +6,81 @@ import dask.array as da
 import shutil
 import typing
 import zarr
+from dask import delayed
+
+def mmap_load_chunk(
+    file:str, 
+    sl:slice,
+    ext:int=0,
+    memmap:bool=True,
+    mode:str="denywrite",
+) -> da.Array:
+    """Create a memory-mapped array from a FITS file.
+
+    Args:
+        file (str): FITS file to read.
+        sl (slice): Slice to read.
+
+    Returns:
+        da.Array: Dask array chunk.
+    """
+    with fits.open(file, memmap=memmap, mode=mode) as hdulist:
+        data = hdulist[ext].data
+    return data[sl]
+
+def mmap_dask_array(
+    file:str,
+    ext:int=0,
+    memmap:bool=True,
+    mode:str="denywrite",
+    blocksize:int=5
+) -> da.Array:
+    """Memmap a FITS file to a Dask array.
+
+    Args:
+        file (str): FITS file to read.
+        ext (int, optional): HDUList extension. Defaults to 0.
+        memmap (bool, optional): Read using memmap. Defaults to True.
+        mode (str, optional): FITS read mode. Defaults to "denywrite".
+        blocksize (int, optional): hunksize along fast (last) axis. Defaults to 5.
+
+    Returns:
+        da.Array: Full Dask array.
+    """
+    arr = mmap_load_chunk(
+        file=file, 
+        sl=slice(0,-1),
+        ext=ext, 
+        memmap=memmap,
+        mode=mode,
+    )
+    shape = arr.shape
+    dtype = arr.dtype
+
+    load = delayed(mmap_load_chunk)
+    chunks = []
+    print(shape)
+    for index in range(0, shape[-1], blocksize):
+        # Truncate the last chunk if necessary
+        chunk_size = min(blocksize, shape[-1] - index)
+        chunk = da.from_delayed(
+            load(
+                file,
+                sl=slice(index, index + chunk_size)
+            ),
+            shape= shape[:-1] + (chunk_size,),
+            dtype=dtype
+        )
+        chunks.append(chunk)
+    return da.concatenate(chunks, axis=-1)
 
 def read(
     file: str,
     ext:int=0,
     memmap:bool=True,
     mode:str="denywrite",
-    chunks:str="auto",
     return_header: bool = False,
-    fits_kwargs: dict = {},
-    dask_kwargs: dict = {},
+    blocksize:int=5,
 ) -> typing.Tuple[da.Array, typing.Optional[typing.Dict]]:
     """Read FITS file to DataArray.
 
@@ -24,21 +89,24 @@ def read(
         ext (int, optional): FITS extension to read. Defaults to 0.
         memmap (bool, optional): Use memmap. Defaults to True.
         mode (str, optional): Read mode. Defaults to "denywrite".
-        chunks (str, optional): Dask array chunks. Defaults to "auto".
         return_header (bool, optional): Optionally return the FITS header. Defaults to False.
-        fits_kwargs (dict, optional): Additional keyword arguments passed onto fits.open. Defaults to None.
-        dask_kwargs (dict, optional): Additional keyword arguments passed onto dask.from_array. Defaults to None.
-
+        blocksize (int, optional): Chunksize along fast (last) axis. Defaults to 5.
 
     Returns:
         typing.Tuple[da.Array, typing.Optional[typing.Dict]]: DataArray and (optionally) FITS header.
     """
-    with fits.open(file, memmap=memmap, mode=mode, **fits_kwargs) as hdulist:
-        header = hdulist[ext].header
-        data = hdulist[ext].data
-    array = da.from_array(data, chunks=chunks, **dask_kwargs)
+    # Distribute the read using memmap
+    array = mmap_dask_array(
+        file=file,
+        ext=ext,
+        memmap=memmap,
+        mode=mode,
+        blocksize=blocksize,        
+    )
 
     if return_header:
+        with fits.open(file, memmap=memmap, mode=mode) as hdulist:
+            header = hdulist[ext].header
         return array, header
     return array
 
