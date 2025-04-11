@@ -146,3 +146,4 @@ test.py
 *.ipynb
 *.fits
 *.zarr
+dafits/_version.py
