@@ -4,7 +4,8 @@ Provides FITS I/O with Dask Arrays.
 
 As per Astropy issue [#11159](https://github.com/astropy/astropy/issues/11159), dask arrays cannot be written right now when using `dask.distributed`
 
-![I'll write it myself](fine.webp "I'll do it myself")
+<img src="fine.webp" alt="fine" width="400
+"/>
 
 ## Installation
 
