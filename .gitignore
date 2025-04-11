@@ -147,3 +147,4 @@ test.py
 *.fits
 *.zarr
 dafits/_version.py
+dafits/cubelet.fits.gz
