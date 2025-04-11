@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""FITS I/O with dask."""
 
-"""Top-level package for xarray-fits."""
+from __future__ import annotations
 
-__author__ = """Alec Thomson"""
-__email__ = 'alec.thomson@csiro.au'
+from dafits.io import getdata, getheader, writeto
 
-from dafits.core import *
+from ._version import version as __version__
+
+__all__ = ["__version__", "getdata", "getheader", "writeto"]
