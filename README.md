@@ -1,6 +1,6 @@
 # da-fits
 
-Provies FITS I/O with Dask Arrays.
+Provides FITS I/O with Dask Arrays.
 
 As per Astropy issue [#11159](https://github.com/astropy/astropy/issues/11159), dask arrays cannot be written right now when using `dask.distributed`
 
@@ -27,11 +27,7 @@ with Client() as client:
     # Write a Dask array to FITS
     # This is the magic function that does not work with
     # regular astropy.io.fits
-    writeto(
-        "output.fits,
-        da_array,
-        header
-    )
+    writeto("output.fits", da_array, header)
 ```
 
 ## License
