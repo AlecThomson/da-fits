@@ -22,33 +22,30 @@ BIT_DICT = {
     8: 1,
 }
 
+
 def getdata(
-        filename: Path | str, 
-        ext: int = 0,
+    filename: Path | str,
+    ext: int = 0,
 ) -> da.Array:
     header = fits.getheader(filename, ext=ext)
     wcs = WCS(header)
     chunks = list(wcs.array_shape)
     if len(chunks) > 2:
         chunks[0] = 1
-        
-    return  da.from_array(
+
+    return da.from_array(
         fits.getdata(
             filename,
             ext=ext,
             memmap=True,
         ),
-        chunks=chunks
+        chunks=chunks,
     )
 
-def getheader(
-        filename: Path | str,
-        ext: int = 0
-) -> fits.Header:
-    return fits.getheader(
-        filename,
-        ext=ext
-    )
+
+def getheader(filename: Path | str, ext: int = 0) -> fits.Header:
+    return fits.getheader(filename, ext=ext)
+
 
 def init_fits_image(
     output_file: Path | str,
@@ -126,6 +123,7 @@ def init_fits_image(
 
     return fits.getheader(output_file), data.dtype
 
+
 @delayed
 def _write_chunk_to_file(
     chunk: ArrayLike,
@@ -165,7 +163,7 @@ def writeto(
     else:
         new_chunksize = list(data.shape)
         new_chunksize[0] = 1
-    
+
     data = data.rechunk(new_chunksize).astype(dtype)
 
     results = []
@@ -179,4 +177,3 @@ def writeto(
         )
         results.append(result)
     compute(results)
-        
