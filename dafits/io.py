@@ -103,7 +103,7 @@ def _init_large_file(
         overwrite=overwrite,
     )
 
-    bytes_per_value = BIT_DICT.get(abs(output_header["BITPIX"]), None)
+    bytes_per_value = BIT_DICT.get(abs(output_header["BITPIX"]))
     msg = f"Header BITPIX={output_header['BITPIX']}, bytes_per_value={bytes_per_value}"
     logger.info(msg)
     if bytes_per_value is None:
